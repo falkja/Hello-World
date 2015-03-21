@@ -1,0 +1,193 @@
+*******************************************************************************
+function ipinmaskrange($network,  $mask,  $ip) {
+    $ip_long=ip2long($ip);
+    $network_long=ip2long($network);
+    $mask_long=ip2long($mask);
+
+    if (($ip_long & $mask_long) == $network_long) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+// *******************************************************************************
+//  IP In Range
+//  Specify a range in the form a-b and the routine returns a true if the passed
+//  IP address is in that range.
+//  Example: ipinrange("192.168.100.0-192.168.100.255",  "192.168.100.20")
+//  Returns true because the example is in the network
+//  Example2: ipinrange("192.168.100.0-192.168.100.255",  "192.168.101.20")
+//  Returns false because the example is outside the network
+// *******************************************************************************
+function ipinrange($range, $ip) {
+  $range = explode("-", $range);
+  $rangestart = ip2long($range[0]);
+  $rangeend = ip2long($range[1]);
+  $remote_ip = ip2long($ip);
+  if (($remote_ip >= $rangestart) && ($remote_ip <= $rangeend)) {
+    return true;
+  }
+  else {
+    return false;
+  }
+}
+
+// *******************************************************************************
+//  IMAP Get Full Header
+//  (Thanks JamieD - http://www.codingforums.com/archive/index.php?t-89994.html)
+//  Returns an array containing the original message header
+// *******************************************************************************
+function imap_get_full_header( $p_stream, $p_msg_number )
+{
+    $header_string = imap_fetchheader ( $p_stream, $p_msg_number );
+    $header_array = explode ( "\n", $header_string );
+    foreach($header_array as $line)
+    {
+        if(eregi("^([^:]*): (.*)", $line, $arg))
+        {
+            $header_obj[$arg[1]] = $arg[2];
+            $last = $arg[1];
+        }
+        else
+        {
+            $header_obj[$last] .= "\n" . $line;
+        }
+    }
+    return ( $header_obj );
+}
+
+
+// *******************************************************************************
+//  Blocked IP
+//  Performs a DNS check against a specific IP address.
+//  Domain Name Server Blacklists (DNSBLs) use this method to declare whether an
+//  email has been sent from an IP address that has been known to send spam.
+// *******************************************************************************
+function BlockedIP($Suspect_IP, $DNSvr_Address)
+{
+    $ReverseOrderedIP = array_reverse(explode('.', $Suspect_IP));
+    $FullLookupAddress = implode('.',  $ReverseOrderedIP) . '.' . $DNSvr_Address;
+    if ($FullLookupAddress != gethostbyname($FullLookupAddress)) {
+      return true;
+    } else {
+      return false;
+    }
+}
+
+// *******************************************************************************
+//  Sender IP
+//  Given a mailbox and message number, this routine returns the IP address of
+//  computer that sent the email.  The "from" address can be faked, this IP
+//  address cannot.
+// *******************************************************************************
+function senderip($mbox, $num){
+  $struct  = imap_get_full_header($mbox, $num);
+  $str_in = $struct['Received-SPF'];
+
+  $tween="";  // not needed but good practise when appending
+  $chr1='client-ip=';
+  $chr2=';';
+
+  for ($i=strpos($str_in, $chr1)+10;$i<strpos($str_in, $chr2);$i++) {
+    $tween=$tween.$str_in[$i];
+  }
+  return $tween;
+}
+
+// *******************************************************************************
+//  Is Black Listed
+//  This the core routine.  Given an IP address, it runs some checks to decide if
+//  the email was sent from a black listed spammer.
+//  Usage: $is_it_spam = isblacklisted("192.168.100.1");
+// *******************************************************************************
+function isblacklisted($ip){
+  // If there are some people I never even want to see an email from, I would put
+  // their IP address in the blacklist ranges.
+  // Example: $BlackList = array("192.168.100.1-192.168.100.5","192.168.102.112-192.168.102.112");
+  $BlackList = array();
+
+
+  // If there are some people that are declared as spammers by a blocking service I want to use
+  // I would declare them in the white list.
+  $WhiteList = array("64.233.160.0-64.233.191.255",  // Google mail is allowed
+                     "12.196.88.128-12.196.88.159"); // A false listing due to virus infection that has been purged.
+
+  // Check white list membership first for optimization reasons.
+  $allowed = false;
+  foreach($WhiteList as $range) {
+    if(ipinrange($range, $ip)) {
+      $allowed=true;
+    }
+  }
+
+  // If this address doesn't get a free pass, check it out further.
+  if (!$allowed) {
+    // Iterate the black lists and check the ip address against them
+    foreach($BlackList as $range) {
+      if(ipinrange($range, $ip)) {
+        $blocked=true;
+      }
+    }
+
+    // PHP uses "Short Circuit Evaluation" so as soon as at true is hit, the routine exits out.
+    // This statement should be optimized with the local check first, and then the DNSBLs from
+    // the most inclusive to the least.  You want to do as few external checks as possible.
+    // The full version of this script comes with several other recommended DNSBLs and my full list
+    // of DNSBLs of which I am aware.
+    return ($blocked ||
+           (BlockedIP($ip, 'bl.spamcop.net')) ||
+           (BlockedIP($ip, 'sbl-xbl.spamhaus.org')) ||
+           (BlockedIP($ip, 'dnsbl-2.uceprotect.net')) ||
+           (BlockedIP($ip, 'blackholes.five-ten-sg.com')) ||
+           (BlockedIP($ip, 'bl.spamcannibal.org')) ||
+          (false));
+  }
+  else {
+    return false ;
+  }
+// NEVER BLOCK WITH: BLARSBL, FIVETENIGNORE, FIVETENSRC, JAMMDNSBL, SPAMBAG, SPEWS (these block large IP ranges)
+// NEVER BLOCK WITH: MAPS-DUL, SORBS-DUHL (these knowingly list IPs that do not meet listing criteria).
+}
+
+
+// This routine iterates all of the emails on the server and checks if they are spam.
+// if they are it deletes them.  Because it is an IMAP server, they are still online
+// If you wish to remove them, use a purge command.
+function blockspam($MAILSERVER, $PHP_AUTH_USER, $PHP_AUTH_PW){
+  $mbox=imap_open($MAILSERVER, $PHP_AUTH_USER, $PHP_AUTH_PW);
+
+  // In this example version, this iterates ALL messages in your mailbox.
+  // The full version only iterates the new messages that have come in.
+  // By doing that, you can run this check as often as once a once a minute and have much
+  // less traffic running the check once an hour.  If you abuse a DNSBL service, they might
+  // block your IP address.
+  for($x=0; $x < imap_num_msg($mbox); $x++) {
+     $idx=($x+1);
+     $ip=senderip($mbox, $idx);
+     if (isblacklisted($ip)) {
+       imap_delete($mbox, $idx);
+     }
+  }
+  imap_close($mbox);
+}
+
+/*********************************************************************************/
+/*                                   Main Calls                                  */
+/*********************************************************************************/
+  // This initial version only works with imap servers.  That means you use
+  // port 143.
+  // Uncomment this line and put in your email server, email login and password
+  // blockspam("{imap.example.com:143}", "you@example.com","yourpassword");
+
+  // I don't like storing the passwords in plain text.  You can use Rot13 as a
+  // really simple encryption method then you can have this file on your screen
+  // without a passer-by seeing your email password.  Rot13 doesn't make it safe
+  // no two-way encyrption in source does, but it will block wandering eyes.
+  // Use http://rot13.thecodecave.com to get the encyrpted versions of the text.
+  // That above line would look something like this:
+  // blockspam(str_rot13("{vznc.rknzcyr.pbz:143}"), str_rot13("lbh@rknzcyr.pbz"), str_rot13("lbhecnffjbeq"));
+
+  // If you have multiple accounts, add another block spam line.
+
+?>
