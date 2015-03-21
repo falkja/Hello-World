@@ -1,0 +1,118 @@
+<?php
+	$host="localhost"; // Host name
+	$username="root"; // Mysql username
+	$password=""; // Mysql password
+
+$link=mysql_connect($host, $username, $password);
+if(!$link) die('
+<p style="text-align: center;	font-size: 20pt;"><span style="color: #FF0000;">Failed to connect to the database! </span>
+<br><span style="font-size: 12pt;">&gt;&gt;Please check the parameters and database server&lt;&lt;</span></p>
+');
+
+$db_name="guestbook"; 
+$result=mysql_select_db($db_name);
+if(!$result){
+forumsetup();
+}
+$result=mysql_select_db($db_name);
+$tbl_name="issues";
+$sql="SELECT * FROM $tbl_name";
+$result=mysql_query($sql,$link) or die('sss'.mysql_error());
+$cn=1;
+while($rows=mysql_fetch_array($result)){ // Start looping table row 
+	$cn++;
+	echo '
+	<table align="center" style="width: 500; font-family: \'Times New Roman\', Times, serif;font-size:  12pt; border: 1px solid #000000" cellpadding="5" cellspacing="1">
+	<tr>
+		<td style="height: 30; border: 1px solid #0000FF; background-color: #DEDEDE;"><strong>From:
+		<span style="color: #066B12">'.$rows['name'].'</span></strong></td>
+	</tr>
+	<tr>
+		<td style="height: 30; border: 1px solid #0000FF; color: #066B12;">'.$rows['msg'].'</td>
+	</tr>
+	<tr>
+		<td style="height: 30; border: 1px solid #0000FF; background-color: #DEDEDE;">
+		<a href="mailto:'.$rows['email'].'"><span style="color: #440808">Mail</span></a><span style="color: #440808">&nbsp; -&nbsp; 
+		</span><a href="'.$rows['site'].'"><span style="color: #440808">Website</span></a></td>
+	</tr>
+	</table><br>
+';
+}
+echo'
+<form method="post" action="'.$_SERVER['PHP_SELF'].'?type=new">
+<table align="center" style="width: 500; font-family: \'Times New Roman\', Times, serif;font-size:  12pt; border: 1px solid #000000" cellpadding="5" cellspacing="1">
+	<tr>
+		<td style="height: 30; border: 1px solid #0000FF; background-color: #DEDEDE;"><strong>
+		Name: <input name="name" type="text" id="a_name" size="45"></strong></td>
+	</tr>
+	<tr>
+		<td style="height: 30; border: 1px solid #0000FF; color: #066B12;">
+		<textarea name="msg" id="a_answer" style="width: 482px; height: 90px"></textarea></td>
+	</tr>
+	<tr>
+		<td style="height: 30; border: 1px solid #0000FF; background-color: #DEDEDE; color: #440808;">
+		<table style="width: 100%">
+			<tr>
+				<td style="width: 68px">Mail:</td>
+				<td><input name="email" type="text" id="email" size="45"></td>
+			</tr>
+			<tr>
+				<td style="width: 68px">Website:</td>
+				<td><input name="site" type="text" id="a_email0" size="45"></td>
+			</tr>
+			<tr>
+				<td colspan="2" style="text-align: center">
+				<input type="submit" name="Submit" value="Submit" style="height: 34px">&nbsp;&nbsp; 
+				<input type="reset" name="Submit2" value="Reset" style="height: 32px"></td>
+			</tr>
+		</table>
+		</td>
+	</tr>
+</table>
+</form>
+';
+if (isset($_POST['Submit']) && $_GET['type']=='new'){
+		//$id=$_POST['ID'];
+		$site=$_POST['site'];
+		$msg=$_POST['msg'];
+		$name=$_POST['name'];
+		$email=$_POST['email'];
+		$datetime=date("d/m/y h:i:s"); //create date time
+		$sql="INSERT INTO issues(msg,  name, email, site,datetime)VALUES('$msg', '$name', '$email', '$site', '$datetime')";
+		$result=mysql_query($sql);
+		if($result){
+			echo '<p style="color: #008000;	text-align: center;	font-size: 15pt;"">Your Opinion is Added successfully!
+					<meta http-equiv="refresh" content="0"> ';
+		}else {
+			echo mysql_error();
+		}
+
+}
+function forumsetup(){
+echo('
+<p style="color: #008000;	text-align: left;	font-size: 15pt;"">-Automatic setup is started...</p>
+');
+global $host,$username,$password,$link;
+//$link=mysql_connect($host, $username, $password);
+$sql= 'CREATE DATABASE guestbook';
+if (!mysql_query ($sql, $link)) die('
+<p style="text-align: center;	font-size: 20pt;"><span style="color: #FF0000;">Failed to 
+create database! </span><br><span style="font-size: 12pt;">&gt;&gt;Please check the parameters and database server&lt;&lt;</span></p>
+');
+$sql = "CREATE TABLE `guestbook`.`issues` (
+`msg` LONGTEXT NOT NULL ,
+`name` TEXT NOT NULL ,
+`email` TEXT NOT NULL ,
+`site` TEXT NOT NULL ,
+`datetime` TEXT NOT NULL 
+) ENGINE = InnoDB CHARACTER SET utf8 COLLATE utf8_general_ci;";
+mysql_query($sql) or die(mysql_error());
+echo('
+<p style="color: #008000;	text-align: left;	font-size: 15pt;"">-Automatic setup completed successfully. Your Guest Book is ready!</p>
+');
+}
+?>
+<div style="text-align: center">
+	<font face="Tahoma"><a target="_blank" href="http://www.phpfreecode.com/">
+	<span style="font-size: 8pt; text-decoration: none">PHP Free Code</span></a></font>
+</div>
