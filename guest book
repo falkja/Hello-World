@@ -5,7 +5,7 @@
 
 $link=mysql_connect($host, $username, $password);
 if(!$link) die('
-<p style="text-align: center;	font-size: 20pt;"><span style="color: #FF0000;">Failed to connect to the database! </span>
+<p style="text-align: center;	font-size: 20pt;"><span style="color: #00FFBF;">Failed to connect to the database! </span>
 <br><span style="font-size: 12pt;">&gt;&gt;Please check the parameters and database server&lt;&lt;</span></p>
 ');
 
@@ -24,7 +24,7 @@ while($rows=mysql_fetch_array($result)){ // Start looping table row
 	echo '
 	<table align="center" style="width: 500; font-family: \'Times New Roman\', Times, serif;font-size:  12pt; border: 1px solid #000000" cellpadding="5" cellspacing="1">
 	<tr>
-		<td style="height: 30; border: 1px solid #0000FF; background-color: #DEDEDE;"><strong>From:
+		<td style="height: 30; border: 1px solid #00FFBF; background-color: #DEDEDE;"><strong>From:
 		<span style="color: #066B12">'.$rows['name'].'</span></strong></td>
 	</tr>
 	<tr>
